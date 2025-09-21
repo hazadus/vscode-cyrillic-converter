@@ -1,0 +1,28 @@
+{
+  "editor.formatOnSave": true,
+  "prettier.requireConfig": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "editor.tabCompletion": "onlySnippets",
+  // https://www.youtube.com/watch?v=reT_wnDSaX4
+  // Панель с иконками файлового менеджера, поиском и тд
+  "workbench.activityBar.location": "top",
+  // Панель с открытыми файлами
+  "workbench.sideBar.location": "left",
+  // Табы файлов сверху
+  "workbench.editor.showTabs": "single",
+  "workbench.editor.showIcons": false,
+  "workbench.editor.labelFormat": "long",
+  // Настройка цвета заголовка окна
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#F8DEE5", // Цвет активного заголовка
+    "titleBar.activeForeground": "#000000", // Цвет текста активного заголовка
+    "titleBar.inactiveBackground": "#FBEAED", // Цвет неактивного заголовка
+    "titleBar.inactiveForeground": "#000000" // Цвет текста неактивного заголовка
+  }
+}
