@@ -33,6 +33,14 @@
       {
         "command": "cyrillicLatin.convertSelection",
         "title": "Convert Selected Text"
+      },
+      {
+        "command": "cyrillicLatin.testKeyboardLayout",
+        "title": "Test Keyboard Layout Switch"
+      },
+      {
+        "command": "cyrillicLatin.resetKeyboardLayoutErrors",
+        "title": "Reset Keyboard Layout Error Counter"
       }
     ],
     "configuration": {
@@ -78,6 +86,24 @@
           "type": "boolean",
           "default": false,
           "description": "Показывать уведомления о замене"
+        },
+        "cyrillicLatin.switchKeyboardLayout": {
+          "type": "boolean",
+          "default": false,
+          "description": "Автоматически переключать раскладку клавиатуры на латиницу (только macOS)"
+        },
+        "cyrillicLatin.targetKeyboardLayout": {
+          "type": "string",
+          "default": "com.apple.keylayout.US",
+          "enum": [
+            "com.apple.keylayout.US",
+            "com.apple.keylayout.ABC"
+          ],
+          "enumDescriptions": [
+            "U.S. (стандартная американская раскладка)",
+            "ABC (упрощенная американская раскладка)"
+          ],
+          "description": "Целевая раскладка клавиатуры для переключения (только macOS)"
         }
       }
     },

@@ -43,7 +43,7 @@ export class PerformanceManager {
 
   getAverageTime(operation: string): number {
     const metrics = this.metrics.get(operation);
-    if (!metrics || metrics.length === 0) return 0;
+    if (!metrics || metrics.length === 0) {return 0;}
 
     return metrics.reduce((sum, time) => sum + time, 0) / metrics.length;
   }

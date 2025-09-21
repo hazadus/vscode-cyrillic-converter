@@ -66,6 +66,48 @@ export class NotificationManager {
       });
   }
 
+  showKeyboardLayoutSwitched(success: boolean, layoutName?: string) {
+    if (!this.config.get<boolean>("showNotifications", true)) {
+      return;
+    }
+
+    if (success && layoutName) {
+      vscode.window.showInformationMessage(`Раскладка переключена на ${layoutName}`);
+    } else if (!success) {
+      vscode.window.showWarningMessage("Не удалось переключить раскладку клавиатуры", "Настройки").then((selection) => {
+        if (selection === "Настройки") {
+          vscode.commands.executeCommand("workbench.action.openSettings", "cyrillicLatin.switchKeyboardLayout");
+        }
+      });
+    }
+  }
+
+  showKeyboardLayoutError(error: string) {
+    const message = "Ошибка переключения раскладки";
+    vscode.window.showErrorMessage(message, "Подробности", "Настройки").then((selection) => {
+      if (selection === "Подробности") {
+        vscode.window.showInformationMessage(error);
+      } else if (selection === "Настройки") {
+        vscode.commands.executeCommand("workbench.action.openSettings", "cyrillicLatin.switchKeyboardLayout");
+      }
+    });
+  }
+
+  showAccessibilityPermissionRequired() {
+    const message = "Для переключения раскладки требуются права доступности";
+    const detail = "Перейдите в Системные настройки > Безопасность и конфиденциальность > Конфиденциальность > Универсальный доступ и добавьте VS Code в список разрешенных приложений.";
+
+    vscode.window.showWarningMessage(message, { modal: true, detail }, "Системные настройки", "Отключить функцию").then((selection) => {
+      if (selection === "Системные настройки") {
+        vscode.env.openExternal(vscode.Uri.parse("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"));
+      } else if (selection === "Отключить функцию") {
+        vscode.workspace
+          .getConfiguration("cyrillicLatin")
+          .update("switchKeyboardLayout", false, vscode.ConfigurationTarget.Global);
+      }
+    });
+  }
+
   private pluralize(count: number): string {
     if (count % 10 === 1 && count % 100 !== 11) {
       return "";

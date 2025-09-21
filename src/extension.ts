@@ -66,7 +66,26 @@ export class CyrillicLatinExtension {
       vscode.commands.executeCommand("workbench.action.openSettings", "cyrillicLatin"),
     );
 
-    this.disposables.push(toggleCommand, convertSelectionCommand, showStatsCommand, openSettingsCommand);
+    // Команда тестирования переключения раскладки
+    const testKeyboardLayoutCommand = vscode.commands.registerCommand(
+      "cyrillicLatin.testKeyboardLayout",
+      () => this.testKeyboardLayout(),
+    );
+
+    // Команда сброса счетчика ошибок переключения раскладки
+    const resetKeyboardLayoutErrorsCommand = vscode.commands.registerCommand(
+      "cyrillicLatin.resetKeyboardLayoutErrors",
+      () => this.resetKeyboardLayoutErrors(),
+    );
+
+    this.disposables.push(
+      toggleCommand,
+      convertSelectionCommand,
+      showStatsCommand,
+      openSettingsCommand,
+      testKeyboardLayoutCommand,
+      resetKeyboardLayoutErrorsCommand,
+    );
   }
 
   private registerEventHandlers() {
@@ -89,7 +108,7 @@ export class CyrillicLatinExtension {
   }
 
   private async handleTextChange(event: vscode.TextDocumentChangeEvent) {
-    if (!this.isActive) return;
+    if (!this.isActive) {return;}
 
     try {
       const result = await this.performanceManager.measureAsync("textReplacement", () =>
@@ -120,7 +139,7 @@ export class CyrillicLatinExtension {
   }
 
   private handleActiveEditorChange(editor: vscode.TextEditor | undefined) {
-    if (!editor) return;
+    if (!editor) {return;}
 
     // Проверяем поддержку языка
     const isSupported = this.isSupportedLanguage(editor.document.languageId);
@@ -132,6 +151,7 @@ export class CyrillicLatinExtension {
   private handleConfigurationChange(event: vscode.ConfigurationChangeEvent) {
     if (event.affectsConfiguration("cyrillicLatin")) {
       this.loadConfiguration();
+      this.replacementEngine.updateConfiguration();
       console.log("Конфигурация обновлена");
     }
   }
@@ -188,6 +208,72 @@ export class CyrillicLatinExtension {
   private isSupportedLanguage(languageId: string): boolean {
     const supportedLanguages = ["javascript", "typescript", "vue", "python", "go"];
     return supportedLanguages.includes(languageId);
+  }
+
+  private async testKeyboardLayout() {
+    try {
+      const { KeyboardLayoutSwitcher } = await import("./system/keyboardLayoutSwitcher");
+      const switcher = KeyboardLayoutSwitcher.getInstance();
+
+      // Проверяем платформу
+      if (process.platform !== "darwin") {
+        vscode.window.showWarningMessage("Переключение раскладки поддерживается только на macOS");
+        return;
+      }
+
+      // Проверяем права доступности
+      const hasAccessibility = await switcher.isAccessibilityEnabled();
+      if (!hasAccessibility) {
+        this.notificationManager.showAccessibilityPermissionRequired();
+        return;
+      }
+
+      // Показываем текущую раскладку
+      const currentLayout = await switcher.getCurrentLayout();
+      const currentLayoutName = currentLayout?.name || "Неизвестно";
+
+      // Получаем отладочную информацию о меню
+      const menuItems = await switcher.debugMenuBarItems();
+      const menuInfo = menuItems.join("\n• ");
+
+      // Получаем список доступных раскладок
+      const availableLayouts = await switcher.getAvailableLayouts();
+      const layoutsList = availableLayouts.map((layout) => layout.name).join(", ");
+
+      // Пробуем переключить раскладку
+      const config = vscode.workspace.getConfiguration("cyrillicLatin");
+      const targetLayoutId = config.get<string>("targetKeyboardLayout", "com.apple.keylayout.US");
+
+      switcher.setEnabled(true);
+      switcher.setTargetLayout(targetLayoutId);
+
+      const success = await switcher.switchToLatinLayout();
+
+      // Показываем результат тестирования
+      const message = `Тест переключения раскладки:
+• Текущая раскладка: ${currentLayoutName}
+• Доступные раскладки: ${layoutsList || "Не удалось получить"}
+• Целевая раскладка: ${targetLayoutId}
+• Результат переключения: ${success ? "Успешно" : "Ошибка"}
+
+Элементы меню бара:
+• ${menuInfo}`;
+
+      vscode.window.showInformationMessage("Результат теста", {
+        modal: true,
+        detail: message,
+      });
+    } catch (error) {
+      this.notificationManager.showError(
+        "Ошибка тестирования переключения раскладки",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  private resetKeyboardLayoutErrors() {
+    this.replacementEngine.resetKeyboardLayoutErrors();
+    vscode.window.showInformationMessage("Счетчик ошибок переключения раскладки сброшен. Функция снова активна.");
   }
 
   dispose() {

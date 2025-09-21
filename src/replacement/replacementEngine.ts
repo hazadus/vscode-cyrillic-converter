@@ -3,6 +3,7 @@ import { MappingTable } from "./mappingTable";
 import { ContextAnalyzer, ContextType } from "../parser/contextAnalyzer";
 import { PerformanceManager } from "../utils/performance";
 import { DebounceManager } from "../utils/debounce";
+import { KeyboardLayoutSwitcher } from "../system/keyboardLayoutSwitcher";
 
 export interface ReplacementResult {
   replacements: Array<{
@@ -18,13 +19,20 @@ export class ReplacementEngine {
   private contextAnalyzer: ContextAnalyzer;
   private performanceManager: PerformanceManager;
   private debounceManager: DebounceManager;
+  private keyboardLayoutSwitcher: KeyboardLayoutSwitcher;
   private processingDocuments = new Set<string>();
+  private keyboardSwitchErrorCount = 0;
+  private lastErrorTime = 0;
+  private readonly MAX_ERRORS = 3;
+  private readonly ERROR_RESET_TIME = 60000; // 1 минута
 
   constructor() {
     this.mappingTable = MappingTable.getInstance();
     this.contextAnalyzer = new ContextAnalyzer();
     this.performanceManager = new PerformanceManager();
     this.debounceManager = new DebounceManager();
+    this.keyboardLayoutSwitcher = KeyboardLayoutSwitcher.getInstance();
+    this.loadConfiguration();
   }
 
   async processTextChange(
@@ -116,6 +124,18 @@ export class ReplacementEngine {
 
       if (uniqueReplacements.length > 0) {
         await this.applyReplacements(document, uniqueReplacements);
+
+        // Переключаем раскладку клавиатуры если включена настройка
+        const config = vscode.workspace.getConfiguration("cyrillicLatin");
+        const shouldSwitchLayout = config.get<boolean>("switchKeyboardLayout", false);
+
+        if (shouldSwitchLayout) {
+          try {
+            await this.handleKeyboardLayoutSwitch();
+          } catch (error) {
+            console.error("Ошибка при переключении раскладки:", error);
+          }
+        }
       }
 
       return {
@@ -208,7 +228,7 @@ export class ReplacementEngine {
       (e) => e.document.uri.toString() === document.uri.toString(),
     );
 
-    if (!editor) return;
+    if (!editor) {return;}
 
     await editor.edit((editBuilder) => {
       // Применяем замены в обратном порядке для сохранения позиций
@@ -226,10 +246,121 @@ export class ReplacementEngine {
     return languages[languageId] === true;
   }
 
+  private loadConfiguration(): void {
+    const config = vscode.workspace.getConfiguration("cyrillicLatin");
+    const switchEnabled = config.get<boolean>("switchKeyboardLayout", false);
+    const targetLayout = config.get<string>("targetKeyboardLayout", "com.apple.keylayout.US");
+
+    this.keyboardLayoutSwitcher.setEnabled(switchEnabled);
+    this.keyboardLayoutSwitcher.setTargetLayout(targetLayout);
+  }
+
+  public updateConfiguration(): void {
+    this.loadConfiguration();
+  }
+
+  public resetKeyboardLayoutErrors(): void {
+    this.keyboardSwitchErrorCount = 0;
+    this.lastErrorTime = 0;
+    console.log("Счетчик ошибок переключения раскладки сброшен");
+  }
+
+  private async handleKeyboardLayoutSwitch(): Promise<void> {
+    // Проверяем, не превышен ли лимит ошибок
+    const now = Date.now();
+    if (now - this.lastErrorTime > this.ERROR_RESET_TIME) {
+      this.keyboardSwitchErrorCount = 0;
+    }
+
+    if (this.keyboardSwitchErrorCount >= this.MAX_ERRORS) {
+      console.log("Переключение раскладки временно отключено из-за частых ошибок");
+      return;
+    }
+
+    const config = vscode.workspace.getConfiguration("cyrillicLatin");
+    const targetLayoutId = config.get<string>("targetKeyboardLayout", "com.apple.keylayout.US");
+
+    // Проверяем права доступности (только для macOS)
+    if (process.platform === "darwin") {
+      const hasAccessibility = await this.keyboardLayoutSwitcher.isAccessibilityEnabled();
+      if (!hasAccessibility) {
+        // Импортируем NotificationManager для показа уведомления о правах
+        const { NotificationManager } = await import("../ui/notifications");
+        const notificationManager = new NotificationManager();
+        notificationManager.showAccessibilityPermissionRequired();
+        return;
+      }
+    }
+
+    try {
+      const success = await this.keyboardLayoutSwitcher.switchToLatinLayout();
+      console.log(`Попытка переключения раскладки: ${success ? "успешно" : "неудачно"}`);
+
+      if (success) {
+        // Сбрасываем счетчик ошибок при успешном переключении
+        this.keyboardSwitchErrorCount = 0;
+
+        // Показываем уведомление только если включены уведомления
+        const showNotifications = config.get<boolean>("showNotifications", false);
+        if (showNotifications) {
+          const currentLayout = await this.keyboardLayoutSwitcher.getCurrentLayout();
+          const layoutName = currentLayout?.name || this.getLayoutNameFromId(targetLayoutId);
+
+          const { NotificationManager } = await import("../ui/notifications");
+          const notificationManager = new NotificationManager();
+          notificationManager.showKeyboardLayoutSwitched(true, layoutName);
+        }
+      } else {
+        this.keyboardSwitchErrorCount++;
+        this.lastErrorTime = now;
+
+        if (this.keyboardSwitchErrorCount >= this.MAX_ERRORS) {
+          const { NotificationManager } = await import("../ui/notifications");
+          const notificationManager = new NotificationManager();
+          notificationManager.showKeyboardLayoutError(
+            `Переключение раскладки временно отключено после ${this.MAX_ERRORS} неудачных попыток. Проверьте настройки.`
+          );
+        }
+      }
+    } catch (error) {
+      this.keyboardSwitchErrorCount++;
+      this.lastErrorTime = now;
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Ошибка при переключении раскладки:", errorMessage);
+
+      // Показываем уведомление об ошибке только при первых нескольких ошибках
+      if (this.keyboardSwitchErrorCount <= 2) {
+        const { NotificationManager } = await import("../ui/notifications");
+        const notificationManager = new NotificationManager();
+        notificationManager.showKeyboardLayoutError(errorMessage);
+      } else if (this.keyboardSwitchErrorCount >= this.MAX_ERRORS) {
+        const { NotificationManager } = await import("../ui/notifications");
+        const notificationManager = new NotificationManager();
+        notificationManager.showKeyboardLayoutError(
+          `Переключение раскладки отключено после ${this.MAX_ERRORS} ошибок. Проверьте настройки или отключите функцию.`
+        );
+      }
+    }
+  }
+
+  private getLayoutNameFromId(layoutId: string): string {
+    const idToNameMap: Record<string, string> = {
+      "com.apple.keylayout.US": "U.S.",
+      "com.apple.keylayout.ABC": "ABC",
+      "com.apple.keylayout.Russian": "Russian",
+      "com.apple.keylayout.RussianWin": "Russian - Phonetic",
+      "com.apple.keylayout.Ukrainian-PC": "Ukrainian",
+      "com.apple.keylayout.Belarusian": "Belarusian",
+    };
+
+    return idToNameMap[layoutId] || layoutId.replace("com.apple.keylayout.", "");
+  }
+
   // Метод для ручной замены выделенного текста
   async convertSelection(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return;
+    if (!editor) {return;}
 
     const selection = editor.selection;
     const text = editor.document.getText(selection);
