@@ -247,4 +247,13 @@ export class ReplacementEngine {
 
     vscode.window.showInformationMessage(`Заменено ${text.length} символов`);
   }
+
+  dispose() {
+    // Очищаем набор обрабатываемых документов
+    this.processingDocuments.clear();
+
+    // Освобождаем ресурсы менеджеров
+    this.debounceManager?.dispose();
+    this.performanceManager?.dispose();
+  }
 }

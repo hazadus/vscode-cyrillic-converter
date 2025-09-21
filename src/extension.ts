@@ -14,7 +14,10 @@ export class CyrillicLatinExtension {
   private disposables: vscode.Disposable[] = [];
   private isActive: boolean = false;
 
-  constructor(private context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext) {
+    // Сохраняем контекст для возможного будущего использования
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _context = context;
     this.initialize();
   }
 
@@ -191,9 +194,52 @@ export class CyrillicLatinExtension {
   }
 
   dispose() {
-    this.disposables.forEach((d) => d.dispose());
-    this.statusBarManager.dispose();
-    this.decorationManager.dispose();
+    try {
+      // Сначала очищаем обработчики событий
+      this.disposables.forEach((d) => {
+        try {
+          d.dispose();
+        } catch (error) {
+          console.warn('Ошибка при освобождении ресурса:', error);
+        }
+      });
+      this.disposables = [];
+
+      // Затем очищаем компоненты UI
+      try {
+        this.statusBarManager?.dispose();
+      } catch (error) {
+        console.warn('Ошибка при освобождении StatusBarManager:', error);
+      }
+
+      try {
+        this.decorationManager?.dispose();
+      } catch (error) {
+        console.warn('Ошибка при освобождении DecorationManager:', error);
+      }
+
+      try {
+        this.notificationManager?.dispose();
+      } catch (error) {
+        console.warn('Ошибка при освобождении NotificationManager:', error);
+      }
+
+      try {
+        this.replacementEngine?.dispose();
+      } catch (error) {
+        console.warn('Ошибка при освобождении ReplacementEngine:', error);
+      }
+
+      try {
+        this.performanceManager?.dispose();
+      } catch (error) {
+        console.warn('Ошибка при освобождении PerformanceManager:', error);
+      }
+
+      console.log("Cyrillic → Latin Converter успешно деактивирован");
+    } catch (error) {
+      console.error('Критическая ошибка при деактивации расширения:', error);
+    }
   }
 }
 
@@ -207,6 +253,17 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
   console.log("Деактивация Cyrillic → Latin Converter");
-  extension?.dispose();
-  extension = undefined;
+  try {
+    if (extension) {
+      extension.dispose();
+      console.log("Расширение успешно деактивировано");
+    } else {
+      console.log("Расширение уже было деактивировано");
+    }
+  } catch (error) {
+    console.error('Ошибка при деактивации расширения:', error);
+  } finally {
+    extension = undefined;
+    console.log("Деактивация завершена");
+  }
 }

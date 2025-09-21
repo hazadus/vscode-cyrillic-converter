@@ -75,4 +75,9 @@ export class NotificationManager {
       return "ов";
     }
   }
+
+  dispose() {
+    // NotificationManager не использует ресурсы, требующие явной очистки
+    // Этот метод добавлен для единообразия интерфейса
+  }
 }

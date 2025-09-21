@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 export class StatusBarManager {
   private statusBarItem: vscode.StatusBarItem;
   private isActive: boolean = false;
+  private activityTimer: NodeJS.Timeout | undefined;
 
   constructor() {
     this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -29,15 +30,30 @@ export class StatusBarManager {
   }
 
   showReplacementActivity(count: number) {
+    // Очищаем предыдущий таймер, если есть
+    if (this.activityTimer) {
+      clearTimeout(this.activityTimer);
+      this.activityTimer = undefined;
+    }
+
     const originalText = this.statusBarItem.text;
     this.statusBarItem.text = `$(sync~spin) Заменено: ${count}`;
 
-    setTimeout(() => {
-      this.statusBarItem.text = originalText;
+    this.activityTimer = setTimeout(() => {
+      if (this.statusBarItem) {
+        this.statusBarItem.text = originalText;
+      }
+      this.activityTimer = undefined;
     }, 2000);
   }
 
   dispose() {
+    // Очищаем таймер перед освобождением ресурсов
+    if (this.activityTimer) {
+      clearTimeout(this.activityTimer);
+      this.activityTimer = undefined;
+    }
+
     this.statusBarItem.dispose();
   }
 }

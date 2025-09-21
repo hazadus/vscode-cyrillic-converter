@@ -61,4 +61,9 @@ export class PerformanceManager {
 
     return result;
   }
+
+  dispose() {
+    // Очищаем все собранные метрики
+    this.metrics.clear();
+  }
 }

@@ -5,6 +5,8 @@ export class DecorationManager {
   private replacedTextWithCheckmarkDecorationType!: vscode.TextEditorDecorationType;
   private processingDecorationType!: vscode.TextEditorDecorationType;
   private inlineCommentDecorationType!: vscode.TextEditorDecorationType;
+  private highlightTimer: NodeJS.Timeout | undefined;
+  private commentTimer: NodeJS.Timeout | undefined;
 
   constructor() {
     this.initializeDecorationTypes();
@@ -111,10 +113,19 @@ export class DecorationManager {
     editor.setDecorations(this.replacedTextDecorationType, regularDecorations);
     editor.setDecorations(this.replacedTextWithCheckmarkDecorationType, checkmarkDecorations);
 
+    // Очищаем предыдущий таймер, если есть
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = undefined;
+    }
+
     // Автоматически убираем подсветку через 3 секунды
-    setTimeout(() => {
-      editor.setDecorations(this.replacedTextDecorationType, []);
-      editor.setDecorations(this.replacedTextWithCheckmarkDecorationType, []);
+    this.highlightTimer = setTimeout(() => {
+      if (editor && !editor.document.isClosed) {
+        editor.setDecorations(this.replacedTextDecorationType, []);
+        editor.setDecorations(this.replacedTextWithCheckmarkDecorationType, []);
+      }
+      this.highlightTimer = undefined;
     }, 3000);
   }
 
@@ -189,12 +200,33 @@ export class DecorationManager {
 
     editor.setDecorations(this.inlineCommentDecorationType, decorationOptions);
 
-    setTimeout(() => {
-      editor.setDecorations(this.inlineCommentDecorationType, []);
+    // Очищаем предыдущий таймер комментариев, если есть
+    if (this.commentTimer) {
+      clearTimeout(this.commentTimer);
+      this.commentTimer = undefined;
+    }
+
+    this.commentTimer = setTimeout(() => {
+      if (editor && !editor.document.isClosed) {
+        editor.setDecorations(this.inlineCommentDecorationType, []);
+      }
+      this.commentTimer = undefined;
     }, 5000);
   }
 
   dispose() {
+    // Очищаем все таймеры
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = undefined;
+    }
+
+    if (this.commentTimer) {
+      clearTimeout(this.commentTimer);
+      this.commentTimer = undefined;
+    }
+
+    // Освобождаем типы декораций
     this.replacedTextDecorationType.dispose();
     this.replacedTextWithCheckmarkDecorationType.dispose();
     this.processingDecorationType.dispose();

@@ -39,4 +39,9 @@ export class DebounceManager {
     }
     this.timers.clear();
   }
+
+  dispose() {
+    // Отменяем все активные таймеры при освобождении ресурсов
+    this.cancelAll();
+  }
 }
